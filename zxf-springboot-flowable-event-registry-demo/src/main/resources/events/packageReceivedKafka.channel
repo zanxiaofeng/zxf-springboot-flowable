@@ -1,0 +1,11 @@
+{
+  "key": "packageReceivedKafka",
+  "channelType": "kafka",
+  "type": "inbound",
+  "channelName": "package-received-kafka",
+  "topic": "package-received",
+  "keyDeserializer": "org.apache.kafka.common.serialization.StringDeserializer",
+  "valueDeserializer": "org.apache.kafka.common.serialization.StringDeserializer",
+  "eventKey": "packageReceived",
+  "correlationKeyExpression": "${orderId}"
+}

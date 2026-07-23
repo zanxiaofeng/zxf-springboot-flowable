@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://bpmn.io/schema/bpmn">
+  <message id="Msg_PackageReceived" name="packageReceived"/>
+
+  <process id="DemoProcess" name="MQ Demo Process" isExecutable="true">
+    <startEvent id="start" name="Start">
+      <outgoing>flow1</outgoing>
+    </startEvent>
+
+    <!-- 等待 Kafka 消息：@KafkaListener 收到后调 messageEventReceived 投递 -->
+    <intermediateCatchEvent id="waitPackage" name="Wait for Package (Kafka)"
+                            flowable:asyncBefore="true" flowable:asyncAfter="true">
+      <incoming>flow1</incoming>
+      <outgoing>flow2</outgoing>
+      <messageEventDefinition messageRef="Msg_PackageReceived"/>
+    </intermediateCatchEvent>
+
+    <serviceTask id="confirm" name="Confirm Receipt"
+                 flowable:expression="${demoController.confirm(execution)}">
+      <incoming>flow2</incoming>
+      <outgoing>flow3</outgoing>
+    </serviceTask>
+
+    <endEvent id="end" name="Done">
+      <incoming>flow3</incoming>
+    </endEvent>
+
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="waitPackage"/>
+    <sequenceFlow id="flow2" sourceRef="waitPackage" targetRef="confirm"/>
+    <sequenceFlow id="flow3" sourceRef="confirm" targetRef="end"/>
+  </process>
+</definitions>

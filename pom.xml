@@ -24,6 +24,7 @@
         <module>zxf-springboot-flowable-saga-app-2</module>
         <module>zxf-springboot-flowable-saga-app-3</module>
         <module>zxf-springboot-flowable-saga-app-ext</module>
+        <module>zxf-springboot-flowable-event-registry-demo</module>
     </modules>
 
     <properties>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Event Registry Demo：演示 Flowable Event Registry 声明式事件关联。
+  流程启动 → 等待 packageReceived 事件（由 Kafka/Spring event inbound channel 自动关联）→ 完成。
+
+  与本项目现有 PaymentProcess 的对比：
+  - PaymentProcess 用 <messageEventDefinition messageRef="...">，需要 controller 手动 messageEventReceived 投递。
+  - 本 Demo 用 <flowable:eventEventDefinition eventRef="packageReceived">，由 Event Registry inbound channel 自动关联。
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <process id="EventRegistryDemo" name="Event Registry Demo" isExecutable="true">
+
+    <startEvent id="startEvent" name="Start">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>flow-start-wait</outgoing>
+    </startEvent>
+
+    <!-- 等待 packageReceived 事件：由 Event Registry inbound channel 按 orderId(businessKey) 自动关联 -->
+    <intermediateCatchEvent id="waitForPackage" name="Wait for Package"
+                            flowable:asyncBefore="true" flowable:asyncAfter="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>flow-start-wait</incoming>
+      <outgoing>flow-wait-end</outgoing>
+      <extensionElements>
+        <flowable:eventEventDefinition eventRef="packageReceived" />
+      </extensionElements>
+    </intermediateCatchEvent>
+
+    <endEvent id="endEvent" name="Done">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>flow-wait-end</incoming>
+    </endEvent>
+
+    <sequenceFlow id="flow-start-wait" sourceRef="startEvent" targetRef="waitForPackage"/>
+    <sequenceFlow id="flow-wait-end" sourceRef="waitForPackage" targetRef="endEvent"/>
+  </process>
+</definitions>

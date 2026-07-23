@@ -1,0 +1,11 @@
+{
+  "key": "packageReceived",
+  "name": "Package Received Event",
+  "correlationParameters": [
+    { "name": "orderId", "type": "string" }
+  ],
+  "payload": [
+    { "name": "orderId", "type": "string" },
+    { "name": "trackingNumber", "type": "string" }
+  ]
+}

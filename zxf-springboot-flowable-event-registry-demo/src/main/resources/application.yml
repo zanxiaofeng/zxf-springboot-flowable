@@ -1,0 +1,34 @@
+server:
+  port: 8290
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./flowable-event-demo-h2
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: flowable-demo
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+flowable:
+  database-schema-update: true
+  process-definition-location-prefix: classpath*:/bpmn/
+  history-level: full
+  process:
+    async-executor-activate: true
+
+logging:
+  level:
+    org.flowable: INFO
+    zxf.flowable.eventregistry: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"

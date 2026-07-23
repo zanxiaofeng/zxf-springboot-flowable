@@ -1,0 +1,9 @@
+{
+  "key": "packageReceivedSpring",
+  "channelType": "spring",
+  "type": "inbound",
+  "channelName": "package-received-spring",
+  "eventName": "packageReceivedEvent",
+  "eventKey": "packageReceived",
+  "correlationKeyExpression": "${orderId}"
+}
