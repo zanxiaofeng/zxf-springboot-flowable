@@ -1,0 +1,36 @@
+server:
+  port: 8190
+
+spring:
+  datasource:
+    url: jdbc:h2:file:./flowable-h2-database
+    driverClassName: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2
+  jackson:
+    serialization:
+      FAIL_ON_EMPTY_BEANS: false
+
+flowable:
+  # Flowable 自管引擎库 schema
+  database-schema-update: true
+  # 从 bpmn/ 目录自动部署流程定义（原 Camunda 版用 processes.xml + deployment-resource-pattern）
+  process-definition-location-prefix: classpath*:/bpmn/
+  history-level: full
+  process:
+    async-executor-activate: true
+
+logging:
+  level:
+    org.flowable: INFO
+    zxf.flowable.arch.app.client.http.LoggingRequestInterceptor: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"

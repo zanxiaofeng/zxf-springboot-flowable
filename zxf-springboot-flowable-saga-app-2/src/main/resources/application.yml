@@ -1,0 +1,66 @@
+server:
+  port: 8091
+
+spring:
+  datasource:
+    flowable:
+      url: jdbc:mysql://localhost:3306/flowable?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8&sessionVariables=transaction_isolation='READ-COMMITTED'
+      driverClassName: com.mysql.cj.jdbc.Driver
+      username: flowable
+      password: flowable
+      hikari:
+        maximum-pool-size: 20
+        minimum-idle: 5
+        idle-timeout: 30000
+        connection-timeout: 20000
+        connection-test-query: SELECT 1
+    business:
+      url: jdbc:mysql://localhost:3307/business?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      driverClassName: com.mysql.cj.jdbc.Driver
+      username: business
+      password: business
+      hikari:
+        maximum-pool-size: 20
+        minimum-idle: 5
+        idle-timeout: 30000
+        connection-timeout: 20000
+        connection-test-query: SELECT 1
+  flyway:
+    url: jdbc:mysql://localhost:3307/business?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+    user: business
+    password: business
+    enabled: true
+    baselineOnMigrate: true
+    validateOnMigrate: true
+    locations: classpath:db/migration
+  jackson:
+    serialization:
+      FAIL_ON_EMPTY_BEANS: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+
+logging:
+  level:
+    org.springframework.jdbc.datasource.DataSourceTransactionManager: DEBUG
+    org.flowable: INFO
+
+saga:
+  re-deploy: false
+  app-name: zxf-app-2
+  async-before: true
+  async-after: false
+  register-deployment: true
+  throw-exception: true
+
+flowable:
+  history-level: none
+  database-schema-update: true
+  process:
+    async-executor-activate: true
+    async:
+      executor:
+        max-async-jobs-due-per-acquisition: 1

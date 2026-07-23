@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://bpmn.io/schema/bpmn">
+  <process id="NotificationSubProcess" name="NotificationSubProcess" isExecutable="true">
+    <startEvent id="Event_Notification-Flow-Start" name="Notification Flow Start">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_0tqeimh</outgoing>
+    </startEvent>
+
+    <serviceTask id="Activity_Notification" name="Notification Now"
+                 flowable:asyncBefore="true" flowable:asyncAfter="true"
+                 flowable:expression="${httpRequestDelegate.request('notification', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0tqeimh</incoming>
+      <outgoing>Flow_0loxtkh</outgoing>
+    </serviceTask>
+
+    <boundaryEvent id="Event_Notification-Now-Error" name="Notification Now Error"
+                   attachedToRef="Activity_Notification" cancelActivity="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_1fhrcpf</outgoing>
+      <errorEventDefinition/>
+    </boundaryEvent>
+
+    <endEvent id="Event_Notification-Flow-End" name="Notification Flow End">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0loxtkh</incoming>
+      <incoming>Flow_1fhrcpf</incoming>
+    </endEvent>
+
+    <sequenceFlow id="Flow_0tqeimh" sourceRef="Event_Notification-Flow-Start" targetRef="Activity_Notification"/>
+    <sequenceFlow id="Flow_0loxtkh" sourceRef="Activity_Notification" targetRef="Event_Notification-Flow-End"/>
+    <sequenceFlow id="Flow_1fhrcpf" sourceRef="Event_Notification-Now-Error" targetRef="Event_Notification-Flow-End"/>
+  </process>
+</definitions>

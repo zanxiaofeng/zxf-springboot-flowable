@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://bpmn.io/schema/bpmn">
+  <message id="Message_LoanRequestUpdated" name="LoanProcess.LoanRequestUpdated"/>
+  <message id="Message_Start" name="LaonProcess.Start"/>
+
+  <process id="LoanProcess" name="LoanProcess" isExecutable="true">
+    <startEvent id="StartEvent_Normal-Start" name="Normal Start">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_NormalStart_Prepare</outgoing>
+    </startEvent>
+
+    <startEvent id="Event_Message-Start" name="Message Start">
+      <outgoing>Flow_MessageStart_Prepare</outgoing>
+      <messageEventDefinition messageRef="Message_Start"/>
+    </startEvent>
+
+    <serviceTask id="Activity_Prepare-Loan-Request" name="Prepare Loan Request"
+                 flowable:delegateExpression="${prepareLoanRequestDelegate}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_NormalStart_Prepare</incoming>
+      <incoming>Flow_MessageStart_Prepare</incoming>
+      <incoming>Flow_Loop_Prepare</incoming>
+      <outgoing>Flow_Prepare_LoanRequest</outgoing>
+    </serviceTask>
+
+    <serviceTask id="ServiceTask_Loan-Request" name="Loan Request"
+                 flowable:delegateExpression="${loanRequestDelegate}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_Prepare_LoanRequest</incoming>
+      <outgoing>Flow_LoanRequest_PrepareApprove</outgoing>
+    </serviceTask>
+
+    <serviceTask id="Activity_Prepare-Loan-Approve" name="Prepare Loan Approve"
+                 flowable:delegateExpression="${prepareLoanApproveDelegate}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_LoanRequest_PrepareApprove</incoming>
+      <outgoing>Flow_PrepareApprove_Approve</outgoing>
+    </serviceTask>
+
+    <userTask id="UserTask_Loan-Approve" name="Loan Approve">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        <flowable:taskListener delegateExpression="${loanApproveCompleteListener}" event="complete"/>
+      </extensionElements>
+      <incoming>Flow_PrepareApprove_Approve</incoming>
+      <outgoing>Flow_Approve_End</outgoing>
+    </userTask>
+
+    <boundaryEvent id="Event_Loan-Request-Precheck-Failed" name="Loan Request Precheck Failed"
+                   attachedToRef="UserTask_Loan-Approve" cancelActivity="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_Precheck_Wait</outgoing>
+      <conditionalEventDefinition>
+        <condition>${loanRequestRequest.amount &gt;= 200000}</condition>
+      </conditionalEventDefinition>
+    </boundaryEvent>
+
+    <intermediateCatchEvent id="Event_Wait-for-Loan-Request-Updated" name="Wait for Loan Request Updated">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_Precheck_Wait</incoming>
+      <outgoing>Flow_Loop_Prepare</outgoing>
+      <messageEventDefinition messageRef="Message_LoanRequestUpdated"/>
+    </intermediateCatchEvent>
+
+    <endEvent id="EndEvent_End" name="End">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_Approve_End</incoming>
+    </endEvent>
+
+    <sequenceFlow id="Flow_NormalStart_Prepare" sourceRef="StartEvent_Normal-Start" targetRef="Activity_Prepare-Loan-Request"/>
+    <sequenceFlow id="Flow_MessageStart_Prepare" sourceRef="Event_Message-Start" targetRef="Activity_Prepare-Loan-Request"/>
+    <sequenceFlow id="Flow_Prepare_LoanRequest" sourceRef="Activity_Prepare-Loan-Request" targetRef="ServiceTask_Loan-Request"/>
+    <sequenceFlow id="Flow_LoanRequest_PrepareApprove" sourceRef="ServiceTask_Loan-Request" targetRef="Activity_Prepare-Loan-Approve"/>
+    <sequenceFlow id="Flow_PrepareApprove_Approve" sourceRef="Activity_Prepare-Loan-Approve" targetRef="UserTask_Loan-Approve"/>
+    <sequenceFlow id="Flow_Approve_End" sourceRef="UserTask_Loan-Approve" targetRef="EndEvent_End"/>
+    <sequenceFlow id="Flow_Precheck_Wait" sourceRef="Event_Loan-Request-Precheck-Failed" targetRef="Event_Wait-for-Loan-Request-Updated"/>
+    <sequenceFlow id="Flow_Loop_Prepare" sourceRef="Event_Wait-for-Loan-Request-Updated" targetRef="Activity_Prepare-Loan-Request"/>
+  </process>
+</definitions>

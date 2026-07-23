@@ -1,0 +1,45 @@
+version: '3'
+
+services:
+  flowable:
+    image: mysql:8.4
+    restart: always
+    environment:
+      # root 密码
+      MYSQL_ROOT_PASSWORD: root
+      # 初始化数据库(后续的初始化sql会在这个库执行)
+      MYSQL_DATABASE: flowable
+      # 初始化用户(不能是root 会报错, 后续需要给新用户赋予权限)
+      MYSQL_USER: flowable
+      # 用户密码
+      MYSQL_PASSWORD: flowable
+      # 映射端口
+    ports:
+      - 3306:3306
+    command:
+      --mysql-native-password=ON
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+  business:
+    image: mysql:8.4
+    restart: always
+    environment:
+      # root 密码
+      MYSQL_ROOT_PASSWORD: root
+      # 初始化数据库(后续的初始化sql会在这个库执行)
+      MYSQL_DATABASE: business
+      # 初始化用户(不能是root 会报错, 后续需要给新用户赋予权限)
+      MYSQL_USER: business
+      # 用户密码
+      MYSQL_PASSWORD: business
+      # 映射端口
+    ports:
+      - 3307:3306
+    command:
+      --mysql-native-password=ON
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1

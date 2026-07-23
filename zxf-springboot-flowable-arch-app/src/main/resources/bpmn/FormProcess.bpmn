@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://bpmn.io/schema/bpmn">
+  <message id="Message_3th4pjm" name="FormProcess.message"/>
+
+  <process id="Flow-Form-Process" name="Form Process" isExecutable="true">
+    <extensionElements>
+      <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="end"/>
+    </extensionElements>
+
+    <startEvent id="Event_Form-Start" name="Form Start">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_0tqeimh</outgoing>
+    </startEvent>
+
+    <!-- Prepare Create: build {formId, formData=requestBody} → createFormRequestBody -->
+    <serviceTask id="Activity_Prepare-Create" name="Prepare Create"
+                 flowable:expression="${serializeDelegate.serialize('createFormRequest', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0tqeimh</incoming>
+      <outgoing>Flow_0ie3qay</outgoing>
+    </serviceTask>
+
+    <!-- Create Form: POST /form/create -->
+    <serviceTask id="Activity_Create-Form" name="Create Form"
+                 flowable:expression="${httpRequestDelegate.request('createForm', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0ie3qay</incoming>
+      <outgoing>Flow_0loxtkh</outgoing>
+    </serviceTask>
+
+    <subProcess id="Flow_Wait-for-Update" name="Wait for Update">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="end"/>
+      </extensionElements>
+      <incoming>Flow_0loxtkh</incoming>
+      <incoming>Flow_0eoesmk</incoming>
+      <outgoing>Flow_1g6yoxf</outgoing>
+      <startEvent id="Event_Start-Wait" name="Start Wait">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <outgoing>Flow_17klkwg</outgoing>
+      </startEvent>
+      <intermediateCatchEvent id="Event_Countdown-30-Mins" name="Countdown 30 Mins">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="end"/>
+        </extensionElements>
+        <incoming>Flow_17klkwg</incoming>
+        <outgoing>Flow_17h4inx</outgoing>
+        <timerEventDefinition>
+          <timeDuration>PT30M</timeDuration>
+        </timerEventDefinition>
+      </intermediateCatchEvent>
+      <endEvent id="Event_End-Wait" name="End Wait">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="end"/>
+        </extensionElements>
+        <incoming>Flow_17h4inx</incoming>
+      </endEvent>
+      <sequenceFlow id="Flow_17klkwg" sourceRef="Event_Start-Wait" targetRef="Event_Countdown-30-Mins"/>
+      <sequenceFlow id="Flow_17h4inx" sourceRef="Event_Countdown-30-Mins" targetRef="Event_End-Wait"/>
+    </subProcess>
+
+    <exclusiveGateway id="Gateway_Check-Action" name="Check Action">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_1ilp4k2</incoming>
+      <outgoing>Flow_0xzqpd9</outgoing>
+      <outgoing>Flow_0li02qp</outgoing>
+    </exclusiveGateway>
+
+    <boundaryEvent id="Event_Message-Arrived" name="Message Arrived" attachedToRef="Flow_Wait-for-Update" cancelActivity="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="end"/>
+      </extensionElements>
+      <outgoing>Flow_1ilp4k2</outgoing>
+      <messageEventDefinition messageRef="Message_3th4pjm"/>
+    </boundaryEvent>
+
+    <!-- Prepare Update: {formId, formData=messageBody} → updateFormRequestBody -->
+    <serviceTask id="Activity_Prepare-Update" name="Prepare Update"
+                 flowable:expression="${serializeDelegate.serialize('updateFormRequest', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0xzqpd9</incoming>
+      <outgoing>Flow_157yeuj</outgoing>
+    </serviceTask>
+
+    <!-- Update Form: POST /form/update -->
+    <serviceTask id="Activity_Update-Form" name="Update Form"
+                 flowable:expression="${httpRequestDelegate.request('updateForm', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_157yeuj</incoming>
+      <outgoing>Flow_0eoesmk</outgoing>
+    </serviceTask>
+
+    <!-- Prepare Delete (from message): {formId, formData=messageBody} → deleteFormRequestBody -->
+    <serviceTask id="Activity_Prepare-Delete" name="Prepare Delete"
+                 flowable:expression="${serializeDelegate.serialize('deleteFormRequest', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0li02qp</incoming>
+      <outgoing>Flow_0gsm7gy</outgoing>
+    </serviceTask>
+
+    <!-- Prepare Delete Expired (from timer): {formId, formData=requestBody} → deleteFormRequestBody -->
+    <serviceTask id="Activity_Prepare-Delete-Expired" name="Prepare Delete Expired"
+                 flowable:expression="${serializeDelegate.serialize('deleteExpiredFormRequest', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_1g6yoxf</incoming>
+      <outgoing>Flow_00q5bty</outgoing>
+    </serviceTask>
+
+    <!-- Delete Form: POST /form/delete -->
+    <serviceTask id="Activity_Delete-Form" name="Delete Form"
+                 flowable:expression="${httpRequestDelegate.request('deleteForm', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_00q5bty</incoming>
+      <incoming>Flow_0gsm7gy</incoming>
+      <outgoing>Flow_10jhqii</outgoing>
+    </serviceTask>
+
+    <endEvent id="Event_Form-End" name="Form End">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="end"/>
+      </extensionElements>
+      <incoming>Flow_10jhqii</incoming>
+    </endEvent>
+
+    <sequenceFlow id="Flow_0tqeimh" sourceRef="Event_Form-Start" targetRef="Activity_Prepare-Create"/>
+    <sequenceFlow id="Flow_0ie3qay" sourceRef="Activity_Prepare-Create" targetRef="Activity_Create-Form"/>
+    <sequenceFlow id="Flow_0loxtkh" sourceRef="Activity_Create-Form" targetRef="Flow_Wait-for-Update"/>
+    <sequenceFlow id="Flow_1g6yoxf" sourceRef="Flow_Wait-for-Update" targetRef="Activity_Prepare-Delete-Expired"/>
+    <sequenceFlow id="Flow_1ilp4k2" sourceRef="Event_Message-Arrived" targetRef="Gateway_Check-Action"/>
+    <sequenceFlow id="Flow_0xzqpd9" sourceRef="Gateway_Check-Action" targetRef="Activity_Prepare-Update">
+      <conditionExpression>${messageAction == 'update'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_0li02qp" sourceRef="Gateway_Check-Action" targetRef="Activity_Prepare-Delete">
+      <conditionExpression>${messageAction == 'delete'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_157yeuj" sourceRef="Activity_Prepare-Update" targetRef="Activity_Update-Form"/>
+    <sequenceFlow id="Flow_0eoesmk" sourceRef="Activity_Update-Form" targetRef="Flow_Wait-for-Update"/>
+    <sequenceFlow id="Flow_0gsm7gy" sourceRef="Activity_Prepare-Delete" targetRef="Activity_Delete-Form"/>
+    <sequenceFlow id="Flow_00q5bty" sourceRef="Activity_Prepare-Delete-Expired" targetRef="Activity_Delete-Form"/>
+    <sequenceFlow id="Flow_10jhqii" sourceRef="Activity_Delete-Form" targetRef="Event_Form-End"/>
+  </process>
+</definitions>

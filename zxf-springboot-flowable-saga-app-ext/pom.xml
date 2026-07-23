@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>zxf</groupId>
+        <artifactId>zxf-springboot-flowable</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <!--
+        与 Camunda 版的差异说明：
+        原项目用 Camunda External Task（camunda:type="external"）+ 自定义 LocalExternalTaskWorker 轮询，并关闭 job executor。
+        Flowable 无 External Task 概念，这里改为普通异步 service task + Flowable async job executor（保持开启），
+        由 job executor 负责异步获取与执行；LocalExternalTaskWorker 已移除。
+    -->
+    <artifactId>zxf-springboot-flowable-saga-app-ext</artifactId>
+
+    <dependencies>
+        <dependency>
+            <groupId>zxf</groupId>
+            <artifactId>zxf-springboot-flowable-saga-common</artifactId>
+            <version>1.0.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

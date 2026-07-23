@@ -1,0 +1,93 @@
+package zxf.flowable.saga.saga;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.flowable.engine.ProcessEngine;
+import org.flowable.engine.repository.Deployment;
+import org.flowable.engine.repository.ProcessDefinition;
+import org.flowable.engine.runtime.ProcessInstance;
+import org.flowable.bpmn.model.BpmnModel;
+import org.springframework.stereotype.Component;
+import zxf.flowable.saga.base.SagaBuilder;
+import zxf.flowable.saga.service.FlowableService;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+@Slf4j
+@RequiredArgsConstructor
+@Component
+public class App4Saga {
+    private final String sagaName = "app4-v16";
+    private final ProcessEngine processEngine;
+    private final FlowableService flowableService;
+
+    public void deploySaga() {
+        log.info("{} deploySaga start", this.sagaName);
+
+        try {
+            if (flowableService.sagaRedeploy() || !isSagaDeployed()) {
+                BpmnModel bpmnModelInstance = buildSaga();
+                Deployment deployment = processEngine.getRepositoryService().createDeployment()
+                        .addBpmnModel(this.sagaName + ".bpmn", bpmnModelInstance).deploy();
+                log.info("{} saga deployment is done. (DeploymentId={})", this.sagaName, deployment.getId());
+                return;
+            }
+
+            if (flowableService.registerDeployment()) {
+                ProcessDefinition processDefinition = processEngine.getRepositoryService()
+                        .createProcessDefinitionQuery().processDefinitionKey(this.sagaName).latestVersion().singleResult();
+                        flowableService.registerDeploymentForJobExecutor(processDefinition.getDeploymentId());
+                log.info("{} saga had been deployed, register job executor to the latest deployment. (DeploymentId={})", this.sagaName, processDefinition.getDeploymentId());
+            }
+        } catch (Exception ex) {
+            log.error("Exception when deploy {} saga or register job executor", this.sagaName, ex);
+        }
+
+        log.info("{} deploySaga end", this.sagaName);
+    }
+
+    public String trigger(Integer times, Integer count, Integer start) {
+        start = Optional.ofNullable(start).orElse(4000);
+        log.info("{} trigger start, {}, {}::{}~{}", this.sagaName, getPrefix(), times, start, count);
+        for (int i = start; i < start + count; i++) {
+            createInstance(times, i);
+        }
+        log.info("{} trigger end, {}, {}::{}~{}", this.sagaName, getPrefix(), times, start, count);
+        return String.format("%s#%d-%d~%d", getPrefix(), times, start, count);
+    }
+
+    public void createInstance(Integer times, int number) {
+        String taskId = getPrefix() + "#" + times + "-" + number;
+        Map<String, Object> someVariables = new HashMap<>();
+        someVariables.put("task-id", taskId);
+        //This method will always create instance base on the latest version.
+        //If you use business key, that business key must be unique.
+        ProcessInstance processInstance = processEngine.getRuntimeService().startProcessInstanceByKey(this.sagaName, someVariables);
+        log.info("{} instance, {}, {}", this.sagaName, taskId, flowableService.instanceInfo(processInstance));
+    }
+
+    public String getPrefix() {
+        return "app4@" + flowableService.appName();
+    }
+
+    private Boolean isSagaDeployed() {
+        Boolean hadBeenDeployed = processEngine.getRepositoryService().createProcessDefinitionQuery()
+                .processDefinitionKey(this.sagaName).count() > 0;
+        log.info("{} isSagaDeployed, {}", this.sagaName, hadBeenDeployed);
+        return hadBeenDeployed;
+    }
+
+    private BpmnModel buildSaga() {
+        SagaBuilder sagaBuilder = SagaBuilder.newSaga(this.sagaName, flowableService.asyncBefore(), flowableService.asyncAfter())
+                //R3/PT0S: execute at most 3 times, no delay between executions
+                .activity("App4-Task 1", "zxf.flowable.saga.task.app4.App4Task1Adapter", "R3/PT0S")
+                //R1/PT0S: execute at most 1 time, no retry
+                .activityNoRetry("App4-Task 2", "zxf.flowable.saga.task.app4.App4Task2Adapter")
+                //R3/PT5S: execute at most 3 times, 5 seconds between executions
+                .activity("App4-Task 3", "zxf.flowable.saga.task.app4.App4Task3Adapter", "R3/PT5S")
+                .end();
+        return sagaBuilder.getModel();
+    }
+}

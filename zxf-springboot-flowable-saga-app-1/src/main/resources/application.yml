@@ -1,0 +1,75 @@
+server:
+  port: 8090
+
+spring:
+  datasource:
+    # Flowable 引擎数据源（@Primary，由 Flowable auto-config 绑定）；对应 Camunda 版的 camunda 库
+    flowable:
+      url: jdbc:mysql://localhost:3306/flowable?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8&sessionVariables=transaction_isolation='READ-COMMITTED'
+      driverClassName: com.mysql.cj.jdbc.Driver
+      username: flowable
+      password: flowable
+      hikari:
+        maximum-pool-size: 20
+        minimum-idle: 5
+        idle-timeout: 30000
+        connection-timeout: 20000
+        connection-test-query: SELECT 1
+    # 业务数据源（次级，供 businessJdbcTemplate / businessTransactionManager）
+    business:
+      url: jdbc:mysql://localhost:3307/business?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+      driverClassName: com.mysql.cj.jdbc.Driver
+      username: business
+      password: business
+      hikari:
+        maximum-pool-size: 20
+        minimum-idle: 5
+        idle-timeout: 30000
+        connection-timeout: 20000
+        connection-test-query: SELECT 1
+  flyway:
+    # 显式指向业务库（Flowable 引擎库由 Flowable 自管 schema，避免 TBL_ORDER 建到引擎库）
+    url: jdbc:mysql://localhost:3307/business?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=GMT%2B8
+    user: business
+    password: business
+    enabled: true
+    baselineOnMigrate: true
+    validateOnMigrate: true
+    locations: classpath:db/migration
+  jackson:
+    serialization:
+      FAIL_ON_EMPTY_BEANS: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info,metrics"
+
+logging:
+  level:
+    org.springframework.jdbc.datasource.DataSourceTransactionManager: DEBUG
+    org.flowable: INFO
+
+saga:
+  # 注意：Flowable 无 deployment-aware job executor（采用基于锁的 job 分发），
+  # re-deploy / register-deployment 仍由 FlowableService 读取；registerDeployment 为 no-op + 日志。
+  re-deploy: true
+  app-name: zxf-app-1
+  async-before: true
+  async-after: false
+  register-deployment: true
+  throw-exception: true
+
+flowable:
+  # 禁用历史表写入（对应 Camunda history-level: none）
+  history-level: none
+  # Flowable 自管引擎库 schema
+  database-schema-update: true
+  process:
+    # 启用异步 job executor（saga 任务为 async）
+    async-executor-activate: true
+    async:
+      executor:
+        # 与原项目一致：每次获取少量 job，便于观察 deployment-aware / 多实例分发
+        max-async-jobs-due-per-acquisition: 1

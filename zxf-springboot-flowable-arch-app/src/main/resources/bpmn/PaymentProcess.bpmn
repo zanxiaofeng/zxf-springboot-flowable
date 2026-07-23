@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://bpmn.io/schema/bpmn">
+  <message id="Message_0dqpff6" name="PaymentProcess.Start"/>
+  <message id="Message_2vun4eq" name="PaymentProcess.PackageReceived"/>
+  <message id="Message_2fejuef" name="PaymentProcess.Notification"/>
+  <message id="Message_15n0fu0" name="PaymentProcess.InfoUpdate"/>
+  <message id="Message_39jqfe5" name="PaymentProcess.Cancel"/>
+  <message id="Message_2lmnlh7" name="PaymentProcess.Completed"/>
+  <error id="Error_07bn4il" name="Error_Canceled" errorCode="001"/>
+  <error id="Error_1h0rrnu" name="Error_Expired" errorCode="002"/>
+
+  <process id="PaymentProcess" name="Payment Process" isExecutable="true">
+    <!-- Create Order: POST /task/a {"task":200} -->
+    <serviceTask id="ServiceTask_Create-Order" name="Create Order"
+                 flowable:expression="${httpRequestDelegate.request('createOrder', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_01210fd</incoming>
+      <incoming>Flow_1k11bup</incoming>
+      <outgoing>Flow_1xy67hz</outgoing>
+      <outgoing>Flow_1lw9r4f</outgoing>
+    </serviceTask>
+
+    <startEvent id="Event_Message-Start" name="Message Start">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_01210fd</outgoing>
+      <messageEventDefinition messageRef="Message_0dqpff6"/>
+    </startEvent>
+
+    <startEvent id="Event_Normal-Start" name="Normal Start">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_1k11bup</outgoing>
+    </startEvent>
+
+    <!-- Payment Order: POST /task/a {"task":${paymentOrderCode}} -->
+    <serviceTask id="Activity_Payment-Order" name="Payment Order"
+                 flowable:asyncBefore="true" flowable:asyncAfter="true"
+                 flowable:expression="${httpRequestDelegate.request('paymentOrder', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="end"/>
+      </extensionElements>
+      <incoming>Flow_1xy67hz</incoming>
+      <incoming>Flow_1fsm0pz</incoming>
+      <outgoing>Flow_0e8xsew</outgoing>
+    </serviceTask>
+
+    <exclusiveGateway id="Gateway_Status-Check" name="Status Check">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0e8xsew</incoming>
+      <outgoing>Flow_1ot07yz</outgoing>
+      <outgoing>Flow_0e3ig8c</outgoing>
+    </exclusiveGateway>
+
+    <!-- Shipping Request: POST /task/b -->
+    <serviceTask id="Activity_Shipping-Request" name="Shipping Request"
+                 flowable:asyncBefore="true"
+                 flowable:expression="${httpRequestDelegate.request('shippingRequest', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_1ot07yz</incoming>
+      <outgoing>Flow_0qs2wkb</outgoing>
+    </serviceTask>
+
+    <intermediateCatchEvent id="Event_Wait-for-Payment-Info-Update" name="Wait for Payment Info Update"
+                            flowable:asyncBefore="true" flowable:asyncAfter="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0e3ig8c</incoming>
+      <outgoing>Flow_1fsm0pz</outgoing>
+      <messageEventDefinition messageRef="Message_15n0fu0"/>
+    </intermediateCatchEvent>
+
+    <!-- Shipping Order: POST /task/c -->
+    <serviceTask id="Activity_Sipping-Order" name="Shipping Order"
+                 flowable:expression="${httpRequestDelegate.request('shippingOrder', execution)}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_1yjs2rw</incoming>
+      <outgoing>Flow_024uins</outgoing>
+    </serviceTask>
+
+    <!-- Expired Sub Process: timer PT3M then throw Error_Expired(002) -->
+    <subProcess id="Activity_Expired-Sub-Process" name="Expired Sub Process">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_1lw9r4f</incoming>
+      <startEvent id="Event_Expiry-Monitor-Start" name="Expiry Monitor Start">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <outgoing>Flow_10fhle2</outgoing>
+      </startEvent>
+      <intermediateCatchEvent id="Event_Countdown-30-mins" name="Countdown 30 mins"
+                              flowable:asyncBefore="true" flowable:asyncAfter="true">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <incoming>Flow_10fhle2</incoming>
+        <outgoing>Flow_1dtnsfp</outgoing>
+        <timerEventDefinition>
+          <timeDuration>PT3M</timeDuration>
+        </timerEventDefinition>
+      </intermediateCatchEvent>
+      <endEvent id="Event_Expiry-Monitor-End" name="Expiry Monitor End">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <incoming>Flow_1dtnsfp</incoming>
+        <errorEventDefinition errorRef="Error_1h0rrnu"/>
+      </endEvent>
+      <sequenceFlow id="Flow_10fhle2" sourceRef="Event_Expiry-Monitor-Start" targetRef="Event_Countdown-30-mins"/>
+      <sequenceFlow id="Flow_1dtnsfp" sourceRef="Event_Countdown-30-mins" targetRef="Event_Expiry-Monitor-End"/>
+    </subProcess>
+
+    <!-- Notification Event Sub Process (non-interrupting): on PaymentProcess.Notification → POST /task/c -->
+    <subProcess id="Activity_Notification-Event-Sub-Process" name="Notification Event Sub Process" triggeredByEvent="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <startEvent id="Event_Notification-Start" name="Notification Start"
+                  flowable:asyncBefore="true" flowable:asyncAfter="true" isInterrupting="false">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <outgoing>Flow_17bdjry</outgoing>
+        <messageEventDefinition messageRef="Message_2fejuef"/>
+      </startEvent>
+      <serviceTask id="Activity_Notification" name="Notification"
+                   flowable:expression="${httpRequestDelegate.request('notification', execution)}">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <incoming>Flow_17bdjry</incoming>
+        <outgoing>Flow_1x8sz36</outgoing>
+      </serviceTask>
+      <boundaryEvent id="Event_Notification-Error" name="Notification Error"
+                     flowable:asyncBefore="true" flowable:asyncAfter="true" attachedToRef="Activity_Notification">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <outgoing>Flow_03sbgn2</outgoing>
+        <errorEventDefinition/>
+      </boundaryEvent>
+      <endEvent id="Event_Notification-End" name="Notification End">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <incoming>Flow_1x8sz36</incoming>
+        <incoming>Flow_03sbgn2</incoming>
+      </endEvent>
+      <sequenceFlow id="Flow_17bdjry" sourceRef="Event_Notification-Start" targetRef="Activity_Notification"/>
+      <sequenceFlow id="Flow_1x8sz36" sourceRef="Activity_Notification" targetRef="Event_Notification-End"/>
+      <sequenceFlow id="Flow_03sbgn2" sourceRef="Event_Notification-Error" targetRef="Event_Notification-End"/>
+    </subProcess>
+
+    <intermediateCatchEvent id="Event_Wait-for-Package-Receive" name="Wait for Package Receive"
+                            flowable:asyncBefore="true" flowable:asyncAfter="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0pkd7iv</incoming>
+      <outgoing>Flow_1yjs2rw</outgoing>
+      <messageEventDefinition messageRef="Message_2vun4eq"/>
+    </intermediateCatchEvent>
+
+    <!-- Global Error Handling Event Sub Process: catch any error → call NotificationSubProcess -->
+    <subProcess id="Activity_Global-Error-Handling-Sub-Process" name="Global Error Handling Sub Process" triggeredByEvent="true">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <startEvent id="Event_Error-Start" name="Error Start" flowable:asyncBefore="true" flowable:asyncAfter="true">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <outgoing>Flow_180q8a8</outgoing>
+        <errorEventDefinition/>
+      </startEvent>
+      <callActivity id="Activity_Error-Notification" name="Error Notification" calledElement="NotificationSubProcess">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+          <flowable:in variables="all"/>
+          <flowable:out variables="all"/>
+        </extensionElements>
+        <incoming>Flow_180q8a8</incoming>
+        <outgoing>Flow_0tgwt92</outgoing>
+      </callActivity>
+      <endEvent id="Event_Error-End" name="Error End">
+        <extensionElements>
+          <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+        </extensionElements>
+        <incoming>Flow_0tgwt92</incoming>
+      </endEvent>
+      <sequenceFlow id="Flow_180q8a8" sourceRef="Event_Error-Start" targetRef="Activity_Error-Notification"/>
+      <sequenceFlow id="Flow_0tgwt92" sourceRef="Activity_Error-Notification" targetRef="Event_Error-End"/>
+    </subProcess>
+
+    <!-- Package Notification: correlate PaymentProcess.Notification -->
+    <serviceTask id="Activity_Package-Notification" name="Package Notification"
+                 flowable:asyncAfter="true" flowable:delegateExpression="${notificationDelegate}">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0qs2wkb</incoming>
+      <outgoing>Flow_0pkd7iv</outgoing>
+    </serviceTask>
+
+    <boundaryEvent id="Event_Order-Completed" name="Order Completed"
+                   flowable:asyncBefore="true" flowable:asyncAfter="true" attachedToRef="Activity_Expired-Sub-Process">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_0ogto3w</outgoing>
+      <messageEventDefinition messageRef="Message_2lmnlh7"/>
+    </boundaryEvent>
+
+    <boundaryEvent id="Event_Order-Canceled" name="Order Canceled"
+                   flowable:asyncBefore="true" flowable:asyncAfter="true" attachedToRef="Activity_Expired-Sub-Process">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <outgoing>Flow_0fabkqy</outgoing>
+      <messageEventDefinition messageRef="Message_39jqfe5"/>
+    </boundaryEvent>
+
+    <endEvent id="Event_07iiavw" name="Completed End">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0ogto3w</incoming>
+    </endEvent>
+
+    <!-- End: native message throw PaymentProcess.Completed -->
+    <endEvent id="Event_End" name="End">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_024uins</incoming>
+      <messageEventDefinition messageRef="Message_2lmnlh7"/>
+    </endEvent>
+
+    <endEvent id="Event_Cancel-End" name="Cancel End">
+      <extensionElements>
+        <flowable:executionListener delegateExpression="${loggingExecutionListener}" event="start"/>
+      </extensionElements>
+      <incoming>Flow_0fabkqy</incoming>
+      <errorEventDefinition errorRef="Error_07bn4il"/>
+    </endEvent>
+
+    <sequenceFlow id="Flow_01210fd" sourceRef="Event_Message-Start" targetRef="ServiceTask_Create-Order"/>
+    <sequenceFlow id="Flow_1k11bup" sourceRef="Event_Normal-Start" targetRef="ServiceTask_Create-Order"/>
+    <sequenceFlow id="Flow_1xy67hz" sourceRef="ServiceTask_Create-Order" targetRef="Activity_Payment-Order"/>
+    <sequenceFlow id="Flow_1lw9r4f" sourceRef="ServiceTask_Create-Order" targetRef="Activity_Expired-Sub-Process"/>
+    <sequenceFlow id="Flow_0e8xsew" sourceRef="Activity_Payment-Order" targetRef="Gateway_Status-Check"/>
+    <sequenceFlow id="Flow_1ot07yz" sourceRef="Gateway_Status-Check" targetRef="Activity_Shipping-Request">
+      <conditionExpression>${paymentOrderReturnCode == '200'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_0e3ig8c" sourceRef="Gateway_Status-Check" targetRef="Event_Wait-for-Payment-Info-Update">
+      <conditionExpression>${paymentOrderReturnCode != '200'}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="Flow_1fsm0pz" sourceRef="Event_Wait-for-Payment-Info-Update" targetRef="Activity_Payment-Order"/>
+    <sequenceFlow id="Flow_0qs2wkb" sourceRef="Activity_Shipping-Request" targetRef="Activity_Package-Notification"/>
+    <sequenceFlow id="Flow_0pkd7iv" sourceRef="Activity_Package-Notification" targetRef="Event_Wait-for-Package-Receive"/>
+    <sequenceFlow id="Flow_1yjs2rw" sourceRef="Event_Wait-for-Package-Receive" targetRef="Activity_Sipping-Order"/>
+    <sequenceFlow id="Flow_024uins" sourceRef="Activity_Sipping-Order" targetRef="Event_End"/>
+    <sequenceFlow id="Flow_0ogto3w" sourceRef="Event_Order-Completed" targetRef="Event_07iiavw"/>
+    <sequenceFlow id="Flow_0fabkqy" sourceRef="Event_Order-Canceled" targetRef="Event_Cancel-End"/>
+  </process>
+</definitions>
